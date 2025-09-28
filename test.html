@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <input
+      type="text"
+      id="input"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      inputmode="none"
+      style="ime-mode:disabled; width: 100%; font-size: 20px;"
+    >
+    <div id="keypad" style="display:none; margin-top:12px; gap:8px; flex-wrap:wrap"></div>
+    <script>
+      const input = document.getElementById('input');
+      const keypad = document.getElementById('keypad');
+
+      // 基本注音對應（示例，可再擴充）
+      const map = new Map([
+        ['1', 'ㄅ'], ['2', 'ㄉ'], ['3', 'ˇ'], ['4', 'ˋ'], ['5', 'ㄓ'], ['6', 'ˊ'], ['7', '˙'], ['8', 'ㄚ'], ['9', 'ㄞ'], ['0', 'ㄢ'], ['-', 'ㄦ'],
+        ['q', 'ㄆ'], ['w', 'ㄊ'], ['e', 'ㄍ'], ['r', 'ㄐ'], ['t', 'ㄔ'], ['y', 'ㄗ'], ['u', 'ㄧ'], ['i', 'ㄛ'], ['o', 'ㄟ'], ['p', 'ㄣ'], ['[', 'ㄥ'],
+        ['a', 'ㄇ'], ['s', 'ㄋ'], ['d', 'ㄎ'], ['f', 'ㄑ'], ['g', 'ㄕ'], ['h', 'ㄘ'], ['j', 'ㄨ'], ['k', 'ㄜ'], ['l', 'ㄠ'], [';', 'ㄤ'],
+        ['z', 'ㄈ'], ['x', 'ㄌ'], ['c', 'ㄏ'], ['v', 'ㄒ'], ['b', 'ㄖ'], ['n', 'ㄙ'], ['m', 'ㄩ'], [',', 'ㄝ'], ['.', 'ㄡ'],
+      ]);
+
+      function insertAtCursor(el, text) {
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const before = el.value.slice(0, start);
+        const after = el.value.slice(end);
+        el.value = before + text + after;
+        const newPos = start + text.length;
+        el.setSelectionRange(newPos, newPos);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      // 阻止 IME 組字（部分瀏覽器無法完全阻止，但我們用 keydown 手動插入符號）
+      input.addEventListener('compositionstart', (e) => e.preventDefault?.());
+      input.addEventListener('compositionupdate', (e) => e.preventDefault?.());
+      input.addEventListener('compositionend', (e) => e.preventDefault?.());
+
+      // 攔截鍵盤輸入，直接插入注音符號
+      input.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const key = e.key;
+        if (map.has(key)) {
+          e.preventDefault();
+          insertAtCursor(input, map.get(key));
+        } else if (key === 'Backspace' || key === 'Delete' || key.startsWith('Arrow') || key === 'Tab' || key === 'Enter') {
+          // allow control keys
+          return;
+        } else if (key.length === 1) {
+          // 阻擋其他可見字元，避免 IME 或英數直接寫入
+          e.preventDefault();
+        }
+      });
+
+      // 顯示目前值
+      input.addEventListener('input', () => {
+        console.log(input.value);
+      });
+
+      // 行動裝置：使用自訂觸控鍵盤避免 IME
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (isTouch) {
+        // 避免呼叫系統鍵盤與組字
+        input.readOnly = true;
+        keypad.style.display = 'flex';
+
+        // 建立常用注音鍵盤（可再擴充/調整排序）
+        const rows = [
+          ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ'],
+          ['ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ'],
+          ['ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ'],
+          ['ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ'],
+          ['˙','ˊ','ˇ','ˋ','空白','刪除']
+        ];
+
+        function makeBtn(label) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          btn.style.padding = '10px 12px';
+          btn.style.fontSize = '18px';
+          btn.style.border = '1px solid #ccc';
+          btn.style.borderRadius = '8px';
+          btn.style.background = '#f8f8f8';
+          btn.style.cursor = 'pointer';
+          btn.addEventListener('click', () => {
+            if (label === '刪除') {
+              const start = input.selectionStart;
+              const end = input.selectionEnd;
+              if (start === end && start > 0) {
+                input.setSelectionRange(start - 1, end);
+              }
+              insertAtCursor(input, '');
+            } else if (label === '空白') {
+              insertAtCursor(input, ' ');
+            } else {
+              insertAtCursor(input, label);
+            }
+            input.focus();
+          });
+          return btn;
+        }
+
+        rows.forEach(r => {
+          const rowDiv = document.createElement('div');
+          rowDiv.style.display = 'flex';
+          rowDiv.style.gap = '8px';
+          rowDiv.style.marginBottom = '8px';
+          r.forEach(k => rowDiv.appendChild(makeBtn(k)));
+          keypad.appendChild(rowDiv);
+        });
+      }
+    </script>
+</body>
+</html>
